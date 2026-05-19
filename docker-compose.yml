@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pixelle-postgres
+    environment:
+      POSTGRES_USER: pixelle
+      POSTGRES_PASSWORD: pixelle_dev_password
+      POSTGRES_DB: pixelle_center
+    ports:
+      - "8600:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixelle"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: pixelle-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 可选：pgAdmin 管理数据库
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pixelle-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pixelle.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  redis_data:

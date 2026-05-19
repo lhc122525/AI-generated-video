@@ -1,0 +1,31 @@
+{
+  "name": "pixelle-center",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "db:generate": "pnpm --filter @pixelle/db generate",
+    "db:push": "pnpm --filter @pixelle/db push",
+    "db:migrate": "pnpm --filter @pixelle/db migrate",
+    "db:studio": "pnpm --filter @pixelle/db studio"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.0"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "prisma": "^6.0.0",
+      "@prisma/client": "^6.0.0"
+    }
+  }
+}

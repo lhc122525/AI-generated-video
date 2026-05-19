@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 用户与认证
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  emailVerified DateTime?
+  
+  // 密码认证
+  passwordHash  String?
+  
+  // 基本信息
+  name          String?
+  image         String?
+  
+  // 角色与权限
+  role          UserRole   @default(USER)
+  permissions   Permission[]
+  
+  // 积分
+  credit        UserCredit?
+  
+  // 视频任务
+  videoTasks    VideoTask[]
+  
+  // 订单
+  orders        Order[]
+  
+  // 积分流水
+  transactions  CreditTransaction[]
+  
+  // 客服相关
+  isCustomerService Boolean   @default(false)
+  isOnline          Boolean   @default(false)
+  lastOnlineAt      DateTime?
+  assignedConversations Conversation[] @relation("AssignedAgent")
+  
+  // 对话
+  conversations    Conversation[]
+  
+  // OAuth 账户
+  accounts         Account[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum UserRole {
+  USER
+  VIP
+  OPERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+}
+
+// NextAuth 账户关联
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// ============================================
+// 积分系统
+// ============================================
+
+model UserCredit {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  balance          Int      @default(0)
+  frozenCredits    Int      @default(0)
+  totalPurchased   Int      @default(0)
+  totalConsumed    Int      @default(0)
+  
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id          String          @id @default(uuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        TransactionType
+  amount      Int
+  balanceAfter Int
+  description String?
+  
+  // 关联
+  orderId     String?
+  order       Order?          @relation(fields: [orderId], references: [id])
+  taskId      String?
+  task        VideoTask?      @relation(fields: [taskId], references: [id])
+  
+  createdAt   DateTime        @default(now())
+}
+
+enum TransactionType {
+  PURCHASE      // 充值
+  CONSUME       // 消费
+  REFUND        // 退款
+  ADMIN_ADJUST  // 管理员调整
+  BONUS         // 奖励
+}
+
+// 积分套餐
+model CreditPackage {
+  id          String   @id @default(uuid())
+  name        String
+  credits     Int
+  price       Decimal  @db.Decimal(10, 2)
+  description String?
+  badge       String?  // 标签，如 "热门"
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  
+  orders      Order[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 订单
+model Order {
+  id          String      @id @default(uuid())
+  orderNo     String      @unique @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  packageId   String
+  package     CreditPackage @relation(fields: [packageId], references: [id])
+  
+  credits     Int
+  amount      Decimal     @db.Decimal(10, 2)
+  
+  status      OrderStatus @default(PENDING)
+  paymentMethod String?    // manual, wechat, alipay, stripe
+  paidAt      DateTime?
+  
+  // 管理员审批
+  approvedById String?
+  approvedAt   DateTime?
+  rejectReason String?
+  
+  transactions CreditTransaction[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+}
+
+enum OrderStatus {
+  PENDING     // 待支付
+  PAID        // 已支付待审批（人工充值）
+  APPROVED    // 已审批
+  REJECTED    // 已拒绝
+  CANCELLED   // 已取消
+}
+
+// ============================================
+// 视频任务
+// ============================================
+
+model VideoTask {
+  id            String      @id @default(uuid())
+  taskNo        String      @unique @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 积分
+  creditsCost   Int         @default(0)
+  frozenCredits Int         @default(0)
+  
+  // 任务信息
+  title         String?
+  script        String?     @db.Text
+  templateType  String      @default("image_based")
+  
+  // 配置参数（JSON）
+  params        Json?
+  
+  // 状态
+  status        TaskStatus  @default(PENDING)
+  
+  // 结果
+  outputUrl     String?
+  thumbnailUrl   String?
+  errorMessage  String?
+  
+  // 帧信息
+  frames        VideoTaskFrame[]
+  
+  // 积分流水
+  transactions  CreditTransaction[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  completedAt   DateTime?
+  
+  @@index([userId])
+  @@index([status])
+}
+
+enum TaskStatus {
+  PENDING      // 待处理
+  PROCESSING   // 处理中
+  COMPLETED    // 已完成
+  FAILED       // 失败
+  TIMEOUT      // 超时
+  CANCELLED    // 取消
+}
+
+model VideoTaskFrame {
+  id          String    @id @default(uuid())
+  taskId      String
+  task        VideoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  frameIndex  Int
+  imageUrl    String?
+  narration   String?   @db.Text
+  duration    Float     @default(3.0)
+  
+  createdAt   DateTime  @default(now())
+  
+  @@unique([taskId, frameIndex])
+  @@index([taskId])
+}
+
+// ============================================
+// 客服系统
+// ============================================
+
+model AIBot {
+  id            String   @id @default(uuid())
+  name          String   @default("小Pixelle")
+  avatar        String?
+  description   String?
+  
+  // 对话配置
+  systemPrompt  String   @db.Text
+  welcomeMessage String  @default("你好！有什么可以帮助你的吗？")
+  transferKeywords String[] @default(["人工", "客服", "转人工"])
+  
+  // 知识库
+  knowledgeBases KnowledgeBase[]
+  
+  // 配置
+  isActive    Boolean   @default(true)
+  priority    Int       @default(0)
+  
+  // 统计
+  totalChats  Int       @default(0)
+  totalMessages Int      @default(0)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model KnowledgeBase {
+  id        String   @id @default(uuid())
+  botId     String
+  bot       AIBot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+  
+  question  String   @db.Text
+  answer    String   @db.Text
+  keywords  String[]
+  
+  usageCount Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([botId])
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  
+  // 会话类型
+  type        ConversationType @default(BOT)
+  
+  // 用户
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  visitorId   String?  // 匿名访客
+  
+  // 客服分配
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  // 状态
+  status      ConversationStatus @default(WAITING)
+  
+  // 来源
+  source      String?  // web, app, wechat
+  pageUrl     String?
+  
+  // 统计
+  messageCount Int     @default(0)
+  
+  // 满意度
+  rating      Int?     // 1-5
+  feedback    String?  @db.Text
+  
+  // 消息
+  messages    Message[]
+  
+  // 时间
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([assignedToId])
+}
+
+enum ConversationType {
+  BOT
+  HUMAN
+  TRANSFER
+}
+
+enum ConversationStatus {
+  WAITING
+  ACTIVE
+  CLOSED
+  RESOLVED
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderType     SenderType
+  senderId       String?
+  
+  content        String      @db.Text
+  contentType    ContentType @default(TEXT)
+  
+  // AI
+  aiModel        String?
+  aiConfidence   Float?
+  
+  // 标记
+  isRead         Boolean     @default(false)
+  
+  createdAt      DateTime    @default(now())
+  
+  @@index([conversationId])
+}
+
+enum SenderType {
+  USER
+  BOT
+  AGENT
+  SYSTEM
+}
+
+enum ContentType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+// ============================================
+// 系统配置
+// ============================================
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   @default("string") // string, number, boolean, json
+  group     String   @default("general")
+  description String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
