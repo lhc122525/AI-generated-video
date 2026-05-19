@@ -1,42 +1,23 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  const handleStartCreating = () => {
+    if (session?.user) {
+      router.push('/create');
+    } else {
+      router.push('/auth/login');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🎬</span>
-              <span className="text-xl font-bold text-gray-900">Pixelle</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">
-                积分充值
-              </Link>
-              <button
-                onClick={() => setShowLoginModal(true)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-              >
-                登录
-              </button>
-              <Link
-                href="/auth/register"
-                className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90"
-              >
-                注册
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
@@ -49,7 +30,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setShowLoginModal(true)}
+              onClick={handleStartCreating}
               className="px-8 py-4 text-lg bg-primary text-white rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/25 transition-all"
             >
               立即开始创作
@@ -156,78 +137,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowLoginModal(false)}
-          />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-            <button
-              onClick={() => setShowLoginModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">
-              登录 Pixelle
-            </h3>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  邮箱
-                </label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="your@email.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  密码
-                </label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="••••••••"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary/90"
-              >
-                登录
-              </button>
-            </form>
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">或</span>
-                </div>
-              </div>
-              <div className="mt-6 space-y-3">
-                <button className="w-full py-2 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
-                  <span>🌐</span> 使用 Google 登录
-                </button>
-                <button className="w-full py-2 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
-                  <span>💻</span> 使用 GitHub 登录
-                </button>
-              </div>
-            </div>
-            <p className="mt-6 text-center text-sm text-gray-500">
-              还没有账号？{' '}
-              <Link href="/auth/register" className="text-primary hover:underline">
-                立即注册
-              </Link>
-            </p>
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }
